@@ -17,7 +17,7 @@ class HpsReportTransactionSummary extends HpsTransaction{
         $serviceName = (isset($filterBy) ? HpsTransaction::transactionTypeToServiceName($filterBy) : null);
         foreach ($rsp->Transaction->ReportActivity->Details as $charge) {
             if($filterBy == null || $charge->ServiceName != $serviceName){
-                $summary = new static();
+                $summary = new HpsReportTransactionSummary();
                 $summary->transactionId = (isset($charge->GatewayTxnId) ? $charge->GatewayTxnId : null);
                 $summary->originalTransactionId = (isset($charge->OriginalGatewayTxnId) ? $charge->OriginalGatewayTxnId : null);
                 $summary->maskedCardNumber = (isset($charge->MaskedCardNbr) ? $charge->MaskedCardNbr : null);
