@@ -103,7 +103,7 @@ class securesubmit {
 				hps.tokenize({
 					data: {
 						public_key: \'' . $public_key . '\',
-						number: $(\'.card_number\').val(),
+						number: $(\'.card_number\').val().replace(/\D/g, \'\'),
 						cvc: $(\'.card_cvc\').val(),
 						exp_month: $(\'.card_expiry_month\').val(),
 						exp_year: $(\'.card_expiry_year\').val()
