@@ -19,7 +19,7 @@ class HpsTransaction {
         $transactionHeader->responseDt = $rsp->Header->RspDT;
         $transactionHeader->clientTxnId = (isset($rsp->Header->ClientTxnId) ? $rsp->Header->ClientTxnId : null);
 
-        $transaction = new static($transactionHeader,$txnType);
+        $transaction = new HpsTransaction($transactionHeader,$txnType);
         $transaction->transactionId = $rsp->Header->GatewayTxnId;
         if(isset($rsp->Header->ClientTxnIdSpecified) && $rsp->Header->ClientTxnIdSpecified == true){
             $transaction->clientTransactionId = $transactionHeader->clientTxnId;
