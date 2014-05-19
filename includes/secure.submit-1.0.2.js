@@ -214,4 +214,4 @@
 	
 	return HPS;
 
-}(jQuery.noConflict()));
+}(jQuery));
