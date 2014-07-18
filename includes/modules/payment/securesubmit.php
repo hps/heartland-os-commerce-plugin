@@ -94,7 +94,7 @@ class securesubmit {
         $confirmation['title'] .= '<script type="text/javascript" src="' . DIR_WS_INCLUDES . 'jquery.js"></script>';
     }
     
-	$confirmation['title'] .= '<script type="text/javascript" src="' . DIR_WS_INCLUDES . 'secure.submit-1.0.2.js"></script>';
+	$confirmation['title'] .= '<script type="text/javascript" src="' . DIR_WS_INCLUDES . 'secure.submit-1.1.1.js"></script>';
 	$confirmation['title'] .= '<script type="text/javascript">
 		jQuery(document).ready(function($) {
 			$("form[name=\'checkout_confirmation\']").bind("submit", handleSubmit);
@@ -105,7 +105,7 @@ class securesubmit {
 						public_key: \'' . $public_key . '\',
 						number: $(\'.card_number\').val().replace(/\D/g, \'\'),
 						cvc: $(\'.card_cvc\').val(),
-						exp_month: $(\'.card_expiry_month\').val(),
+						exp_month: $(\'.card_expiry_month\').val(), 
 						exp_year: $(\'.card_expiry_year\').val()
 					},
 					success: function(response) {
@@ -124,8 +124,9 @@ class securesubmit {
 					alert(response.message);
 				} else {
 					var form$ = $("form[name=checkout_confirmation]");
-
+          
 					form$.append("<input type=\'hidden\' name=\'securesubmit_token\' value=\'" + response.token_value + "\'/>");
+          form$.append("<input type=\'hidden\' name=\'card_type\' value=\'" + response.card_type + "\'/>");
 
 					$(\'.card_number\').val(\'\');
 					$(\'.card_cvc\').val(\'\');
@@ -199,6 +200,8 @@ class securesubmit {
                     false,
                     null);
 			}
+
+      $order->info['cc_type'] = $_POST['card_type'];
 		}
 		catch (Exception $e) {
 			tep_redirect(tep_href_link(FILENAME_CHECKOUT_PAYMENT, 'payment_error=' . $this->code . '&error=' . $response->responseText, 'SSL'));
