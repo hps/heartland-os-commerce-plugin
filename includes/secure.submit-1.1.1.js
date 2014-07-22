@@ -60,7 +60,7 @@ var hps = (function ($) {
                 cardType = 'mastercard';
             } else if (re.amex.test($.trim(options.data.number))) {
                 cardType = 'amex';
-            } else if (re.diners.test($.trim(options.da ta.number))) {
+            } else if (re.diners.test($.trim(options.data.number))) {
                 cardType = 'diners';
             } else if (re.discover.test($.trim(options.data.number))) {
                 cardType = 'discover';
