@@ -21,6 +21,10 @@ class securesubmit
         $this->description = MODULE_PAYMENT_SECURESUBMIT_TEXT_DESCRIPTION;
         $this->sort_order = MODULE_PAYMENT_SECURESUBMIT_SORT_ORDER;
         $this->enabled = ((MODULE_PAYMENT_SECURESUBMIT_STATUS == 'True') ? true : false);
+        $this->allow_suspicious = ((MODULE_PAYMENT_SECURESUBMIT_ALLOW_SUSPICIOUS == 'True') ? true : false);
+        $this->email_suspicious = ((MODULE_PAYMENT_SECURESUBMIT_EMAIL_SUSPICIOUS == 'True') ? true : false);
+        $this->email_suspicious_address = MODULE_PAYMENT_SECURESUBMIT_EMAIL_SUSPICIOUS_ADDRESS;
+        $this->fraud_text = MODULE_PAYMENT_SECURESUBMIT_FRAUD_TEXT;
 
         if ((int)MODULE_PAYMENT_SECURESUBMIT_ORDER_STATUS_ID > 0) {
             $this->order_status = MODULE_PAYMENT_SECURESUBMIT_ORDER_STATUS_ID;
@@ -122,7 +126,7 @@ class securesubmit
         if (MODULE_PAYMENT_SECURESUBMIT_INCLUDE_JQUERY) {
             $confirmation['title'] .= '<script type="text/javascript" src="' . DIR_WS_INCLUDES . 'jquery.js"></script>';
         }
-    
+
         $confirmation['title'] .= '<script type="text/javascript" src="' . DIR_WS_INCLUDES . 'secure.submit-1.1.1.js"></script>';
         $confirmation['title'] .= '<script type="text/javascript">
             jQuery(document).ready(function($) {
@@ -134,7 +138,7 @@ class securesubmit
                             public_key: \'' . $public_key . '\',
                             number: $(\'.card_number\').val().replace(/\D/g, \'\'),
                             cvc: $(\'.card_cvc\').val(),
-                            exp_month: $(\'.card_expiry_month\').val(), 
+                            exp_month: $(\'.card_expiry_month\').val(),
                             exp_year: $(\'.card_expiry_year\').val()
                         },
                         success: function(response) {
@@ -153,7 +157,7 @@ class securesubmit
                         alert(response.message);
                     } else {
                         var form$ = $("form[name=checkout_confirmation]");
-              
+
                         form$.append("<input type=\'hidden\' name=\'securesubmit_token\' value=\'" + response.token_value + "\'/>");
                         form$.append("<input type=\'hidden\' name=\'card_type\' value=\'" + response.card_type + "\'/>");
 
@@ -198,7 +202,7 @@ class securesubmit
         $hpsaddress->state = $order->billing['state'];
         $hpsaddress->zip = preg_replace('/[^0-9]/', '', $order->billing['postcode']);
         $hpsaddress->country =$order->billing['country']['title'];
-        
+
         $cardHolder = new HpsCardHolder();
         $cardHolder->firstName = $order->billing['firstname'];
         $cardHolder->lastName = $order->billing['lastname'];
@@ -208,8 +212,8 @@ class securesubmit
 
         $hpstoken = new HpsTokenData();
         $hpstoken->tokenValue = $_POST['securesubmit_token'];
-        
-        
+
+
         try {
             if (MODULE_PAYMENT_SECURESUBMIT_TRANSACTION_METHOD == 'Authorization') {
                 $response = $creditService->authorize(
@@ -233,11 +237,12 @@ class securesubmit
 
             $order->info['cc_type'] = $_POST['card_type'];
         } catch (HpsException $e) {
-            if (MODULE_PAYMENT_SECURESUBMIT_ALLOW_SUSPICIOUS == 'True' && $e->getCode() == 27) {
+            if ($this->allow_suspicious && $e->getCode() == HpsExceptionCodes::POSSIBLE_FRAUD_DETECTED) {
                 // we can skip the card saving: if it fails for possible fraud there will be no token.
-                if (MODULE_PAYMENT_SECURESUBMIT_EMAIL_SUSPICIOUS == 'yes' && MODULE_PAYMENT_SECURESUBMIT_EMAIL_SUSPICIOUS_ADDRESS != '') {
-                    mail(
-                        MODULE_PAYMENT_SECURESUBMIT_EMAIL_SUSPICIOUS_ADDRESS,
+                if ($this->email_suspicious && $this->email_suspicious_address != '') {
+                    $this->sendEmail(
+                        $this->email_suspicious_address,
+                        $this->email_suspicious_address,
                         'Suspicious order allowed (' . $order_id . ')',
                         'Hello,<br><br>Heartland has determined that you should review order ' . $order_id .
                         ' for the amount of ' . substr($this->format_raw($order->info['total']), 0, 15) . '.'
@@ -245,17 +250,28 @@ class securesubmit
                 }
                 $order->info['cc_type'] = $_POST['card_type'];
             } else {
-                $message = '';
-                if ($e->getCode() == 27) {
-                    $message = $this->fraud_text;
-                } else {
-                    $message = $e->getMessage();
-                }
-                tep_redirect(tep_href_link(FILENAME_CHECKOUT_PAYMENT, 'payment_error=' . $e->getCode() . '&error=' . $message, 'SSL'));
+                $code = $e->getCode();
+                tep_redirect(tep_href_link(FILENAME_CHECKOUT_PAYMENT, 'payment_error=' . $this->code . '&error=' . $code, 'SSL'));
             }
         } catch (Exception $e) {
-            tep_redirect(tep_href_link(FILENAME_CHECKOUT_PAYMENT, 'payment_error=' . $e->getCode() . '&error=' . $e->getMessage(), 'SSL'));
+            tep_redirect(tep_href_link(FILENAME_CHECKOUT_PAYMENT, 'payment_error=' . $this->code . '&error=' . urlencode($e->getMessage()), 'SSL'));
         }
+    }
+
+    public function sendEmail($to, $from, $subject, $body, $headers = array(), $isHtml = true)
+    {
+        $headers[] = sprintf('From: %s', $from);
+        $headers[] = sprintf('Reply-To: %s', $from);
+
+        $message = $body;
+        if ($isHtml) {
+            $message = sprintf('<html><body>%s</body></html>', $body);
+            $headers[] = 'MIME-Version: 1.0';
+            $headers[] = 'Content-Type: text/html; charset=ISO-8859-1';
+        }
+        $message = wordwrap($message, 70, "\r\n");
+
+        mail($to, $subject, $message, implode("\r\n", $headers));
     }
 
     public function after_process()
@@ -284,6 +300,10 @@ class securesubmit
 
             case 'cvc':
                 $error_message = MODULE_PAYMENT_SECURESUBMIT_ERROR_CVC;
+                break;
+
+            case '27':
+                $error_message = $this->fraud_text;
                 break;
 
             default:
