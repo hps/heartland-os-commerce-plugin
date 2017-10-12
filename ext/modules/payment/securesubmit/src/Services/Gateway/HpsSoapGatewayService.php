@@ -1,8 +1,19 @@
 <?php
 
-class HpsSoapGatewayService extends HpsGatewayServiceAbstract
+/**
+ * Class HpsSoapGatewayService
+ */
+class HpsSoapGatewayService extends HpsGatewayServiceAbstract implements HpsGatewayServiceInterface
 {
-    public function doTransaction($transaction, $clientTransactionId = null)
+    /**
+     * @param       $transaction
+     * @param array $options
+     *
+     * @return mixed
+     * @throws \HpsAuthenticationException
+     * @throws \HpsGatewayException
+     */
+    public function doRequest($transaction, $options = array())
     {
         $xml = new DOMDocument('1.0', 'utf-8');
         $soapEnvelope = $xml->createElement('soapenv:Envelope');
@@ -16,7 +27,7 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
         $hpsHeader = $xml->createElement('hps:Header');
 
         if ($this->_config->secretApiKey != null && $this->_config->secretApiKey != "") {
-            $hpsHeader->appendChild($xml->createElement('hps:SecretAPIKey', $this->_config->secretApiKey));
+            $hpsHeader->appendChild($xml->createElement('hps:SecretAPIKey', trim($this->_config->secretApiKey)));
         } else {
             $hpsHeader->appendChild($xml->createElement('hps:SiteId', $this->_config->siteId));
             $hpsHeader->appendChild($xml->createElement('hps:DeviceId', $this->_config->deviceId));
@@ -29,8 +40,8 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
             $hpsHeader->appendChild($xml->createElement('hps:VersionNbr', $this->_config->versionNumber));
             $hpsHeader->appendChild($xml->createElement('hps:SiteTrace', $this->_config->siteTrace));
         }
-        if ($clientTransactionId != null) {
-            $hpsHeader->appendChild($xml->createElement('hps:ClientTxnId', $clientTransactionId));
+        if (isset($options['clientTransactionId'])) {
+            $hpsHeader->appendChild($xml->createElement('hps:ClientTxnId', $options['clientTransactionId']));
         }
 
         $hpsVersion->appendChild($hpsHeader);
@@ -54,7 +65,14 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
 
         return $this->submitRequest($url, $header, $data);
     }
-
+    /**
+     * @param $curlResponse
+     * @param $curlInfo
+     * @param $curlError
+     *
+     * @return mixed
+     * @throws \HpsException
+     */
     public function processResponse($curlResponse, $curlInfo, $curlError)
     {
         // print "\n" . $curlResponse;
@@ -73,7 +91,12 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
                 break;
         }
     }
-
+    /**
+     * @param              $details
+     * @param \DOMDocument $xml
+     *
+     * @return \DOMElement
+     */
     public function _hydrateAdditionalTxnFields($details, DOMDocument $xml)
     {
         $additionalTxnFields = $xml->createElement('hps:AdditionalTxnFields');
@@ -92,22 +115,42 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
 
         return $additionalTxnFields;
     }
-
+    /**
+     * @param \HpsCardHolder $cardHolder
+     * @param \DOMDocument   $xml
+     *
+     * @return \DOMElement
+     * @throws \HpsInvalidRequestException
+     */
     public function _hydrateCardHolderData(HpsCardHolder $cardHolder, DOMDocument $xml)
     {
+        //handle both phone and phoneNumber properties as a valid phone
+        if($cardHolder->phone === null && !empty($cardHolder->phoneNumber) === true){
+            $cardHolder->phone = $cardHolder->phoneNumber;
+        }              
+        //handle both email and emailAddress properties as a valid email
+        if($cardHolder->email === null && !empty($cardHolder->emailAddress) === true){
+            $cardHolder->email = $cardHolder->emailAddress;
+        }               
+        
         $cardHolderData = $xml->createElement('hps:CardHolderData');
-        $cardHolderData->appendChild($xml->createElement('hps:CardHolderFirstName', $cardHolder->firstName));
-        $cardHolderData->appendChild($xml->createElement('hps:CardHolderLastName', $cardHolder->lastName));
-        $cardHolderData->appendChild($xml->createElement('hps:CardHolderEmail', $cardHolder->email));
-        $cardHolderData->appendChild($xml->createElement('hps:CardHolderPhone', $cardHolder->phone));
-        $cardHolderData->appendChild($xml->createElement('hps:CardHolderAddr', $cardHolder->address->address));
-        $cardHolderData->appendChild($xml->createElement('hps:CardHolderCity', $cardHolder->address->city));
-        $cardHolderData->appendChild($xml->createElement('hps:CardHolderState', $cardHolder->address->state));
-        $cardHolderData->appendChild($xml->createElement('hps:CardHolderZip', $cardHolder->address->zip));
+        $cardHolderData->appendChild($xml->createElement('hps:CardHolderFirstName', HpsInputValidation::checkCardHolderData($cardHolder->firstName, 'FirstName')));
+        $cardHolderData->appendChild($xml->createElement('hps:CardHolderLastName', HpsInputValidation::checkCardHolderData($cardHolder->lastName,'LastName')));
+        $cardHolderData->appendChild($xml->createElement('hps:CardHolderEmail', HpsInputValidation::checkEmailAddress($cardHolder->email)));
+        $cardHolderData->appendChild($xml->createElement('hps:CardHolderPhone', HpsInputValidation::checkPhoneNumber($cardHolder->phone)));
+        $cardHolderData->appendChild($xml->createElement('hps:CardHolderAddr', HpsInputValidation::checkCardHolderData($cardHolder->address->address)));
+        $cardHolderData->appendChild($xml->createElement('hps:CardHolderCity', HpsInputValidation::checkCardHolderData($cardHolder->address->city, 'City')));
+        $cardHolderData->appendChild($xml->createElement('hps:CardHolderState', HpsInputValidation::checkCardHolderData($cardHolder->address->state, 'State')));
+        $cardHolderData->appendChild($xml->createElement('hps:CardHolderZip', HpsInputValidation::checkZipCode($cardHolder->address->zip)));
 
         return $cardHolderData;
     }
-
+    /**
+     * @param \HpsCheck    $check
+     * @param \DOMDocument $xml
+     *
+     * @return \DOMElement
+     */
     public function _hydrateCheckData(HpsCheck $check, DOMDocument $xml)
     {
         $checkData = $xml->createElement('hps:AccountInfo');
@@ -134,7 +177,12 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
 
         return $checkData;
     }
-
+    /**
+     * @param \HpsCheck    $check
+     * @param \DOMDocument $xml
+     *
+     * @return \DOMElement
+     */
     public function _hydrateConsumerInfo(HpsCheck $check, DOMDocument $xml)
     {
         $consumerInfo = $xml->createElement('hps:ConsumerInfo');
@@ -191,7 +239,12 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
 
         return $consumerInfo;
     }
-
+    /**
+     * @param \HpsCPCData  $cpcData
+     * @param \DOMDocument $xml
+     *
+     * @return \DOMElement
+     */
     public function _hydrateCPCData(HpsCPCData $cpcData, DOMDocument $xml)
     {
         $cpcDataElement = $xml->createElement('hps:CPCData');
@@ -207,7 +260,12 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
 
         return $cpcDataElement;
     }
-
+    /**
+     * @param \HpsDirectMarketData $data
+     * @param \DOMDocument         $xml
+     *
+     * @return \DOMElement
+     */
     public function _hydrateDirectMarketData(HpsDirectMarketData $data, DOMDocument $xml)
     {
         $directMktDataElement = $xml->createElement('hps:DirectMktData');
@@ -217,7 +275,12 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
 
         return $directMktDataElement;
     }
-
+    /**
+     * @param \HpsEncryptionData $encryptionData
+     * @param \DOMDocument       $xml
+     *
+     * @return \DOMElement
+     */
     public function _hydrateEncryptionData(HpsEncryptionData $encryptionData, DOMDocument $xml)
     {
         $encData = $xml->createElement('hps:EncryptionData');
@@ -225,11 +288,17 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
             $encData->appendChild($xml->createElement('hps:EncryptedTrackNumber', $encryptionData->encryptedTrackNumber));
         }
         $encData->appendChild($xml->createElement('hps:KSN', $encryptionData->ksn));
-        $encData->appendChild($xml->createElement('hps:KTB', $encryptionData->ksn));
+        $encData->appendChild($xml->createElement('hps:KTB', $encryptionData->ktb));
         $encData->appendChild($xml->createElement('hps:Version', $encryptionData->version));
         return $encData;
     }
-
+    /**
+     * @param \HpsGiftCard $giftCard
+     * @param \DOMDocument $xml
+     * @param string       $elementName
+     *
+     * @return \DOMElement
+     */
     public function _hydrateGiftCardData(HpsGiftCard $giftCard, DOMDocument $xml, $elementName = 'CardData')
     {
         $giftCardData = $xml->createElement('hps:'.$elementName);
@@ -253,7 +322,14 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
 
         return $giftCardData;
     }
-
+    /**
+     * @param \HpsCreditCard $card
+     * @param \DOMDocument   $xml
+     * @param bool           $cardPresent
+     * @param bool           $readerPresent
+     *
+     * @return \DOMElement
+     */
     public function _hydrateManualEntry(HpsCreditCard $card, DOMDocument $xml, $cardPresent = false, $readerPresent = false)
     {
         $manualEntry = $xml->createElement('hps:ManualEntry');
@@ -279,38 +355,81 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
 
         return $manualEntry;
     }
-
-    public function _hydrateSecureEcommerce($paymentData, $xml)
+    /**
+     * @param $data
+     * @param $xml
+     *
+     * @return mixed
+     */
+    public function _hydrateSecureEcommerce($data, $xml)
     {
         $secureEcommerce = $xml->createElement('hps:SecureECommerce');
-        $secureEcommerce->appendChild($xml->createElement('hps:TypeOfPaymentData', $paymentData->secure3d));
+        $secureEcommerce->appendChild($xml->createElement('hps:PaymentDataSource', $data->dataSource));
+        $secureEcommerce->appendChild($xml->createElement('hps:TypeOfPaymentData', $data->type));
 
-        $paymentDataElement = $xml->createElement('hps:PaymentData', $paymentData->onlinePaymentCryptogram);
+        $paymentDataElement = $xml->createElement('hps:PaymentData', $data->data);
         $paymentDataElementEncoding = $xml->createAttribute('encoding');
         $paymentDataElementEncoding->value = 'base64';
         $paymentDataElement->appendChild($paymentDataElementEncoding);
+        $secureEcommerce->appendChild($paymentDataElement);
 
-        if ($paymentData->eciIndicator != null && $paymentData->eciIndicator != '') {
-            $secureEcommerce->appendChild($xml->createElement('hps:ECommerceIndicator', $paymentData->eciIndicator));
+        if ($data->eciFlag != null && $data->eciFlag != '') {
+            $secureEcommerce->appendChild($xml->createElement('hps:ECommerceIndicator', $data->eciFlag));
         }
+
+        $xidElement = $xml->createElement('hps:XID', $data->xid);
+        $xidElementEncoding = $xml->createAttribute('encoding');
+        $xidElementEncoding->value = 'base64';
+        $xidElement->appendChild($xidElementEncoding);
+        $secureEcommerce->appendChild($xidElement);
 
         return $secureEcommerce;
     }
-
+ /*
+  * @link https://github.com/hps/heartland-php/pull/21
+  * @description resolves a recursion issue identified in the link above
+  */
+    /**
+     * @param              $token
+     * @param \DOMDocument $xml
+     * @param bool         $cardPresent
+     * @param bool         $readerPresent
+     *
+     * @return \DOMElement
+     */
     public function _hydrateTokenData($token, DOMDocument $xml, $cardPresent = false, $readerPresent = false)
     {
         if (!$token instanceof HpsTokenData) {
+            $tokenValue = $token;
             $token = new HpsTokenData();
-            $token->tokenValue = $token;
+            $token->tokenValue = $tokenValue;
         }
 
         $tokenData = $xml->createElement('hps:TokenData');
         $tokenData->appendChild($xml->createElement('hps:TokenValue', $token->tokenValue));
+
+        if (isset($token->expMonth)) {
+            $tokenData->appendChild($xml->createElement('hps:ExpMonth', $token->expMonth));
+        }
+
+        if (isset($token->expYear)) {
+            $tokenData->appendChild($xml->createElement('hps:ExpYear', $token->expYear));
+        }
+
+        if (isset($token->cvv)) {
+            $tokenData->appendChild($xml->createElement('hps:CVV2', $token->cvv));
+        }
+
         $tokenData->appendChild($xml->createElement('hps:CardPresent', ($cardPresent ? 'Y' : 'N')));
         $tokenData->appendChild($xml->createElement('hps:ReaderPresent', ($readerPresent ? 'Y' : 'N')));
         return $tokenData;
     }
-
+    /**
+     * @param \HpsTrackData $trackData
+     * @param               $xml
+     *
+     * @return mixed
+     */
     public function _hydrateTrackData(HpsTrackData $trackData, $xml)
     {
         $trackDataElement = $xml->createElement('hps:TrackData', $trackData->value);
@@ -319,7 +438,9 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
         $trackDataElement->appendChild($trackDataElementMethod);
         return $trackDataElement;
     }
-
+    /**
+     * @return string
+     */
     private function _gatewayUrlForKey()
     {
         if ($this->_config->secretApiKey != null && $this->_config->secretApiKey != "") {
@@ -334,7 +455,11 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
             return $this->_config->soapServiceUri;
         }
     }
-
+    /**
+     * @param $xml
+     *
+     * @return mixed
+     */
     private function _XML2Array($xml)
     {
         $envelope = simplexml_load_string($xml, "SimpleXMLElement", 0, 'http://schemas.xmlsoap.org/soap/envelope/');
@@ -343,8 +468,13 @@ class HpsSoapGatewayService extends HpsGatewayServiceAbstract
                 return $item;
             }
         }
+        return null;
     }
-
+    /**
+     * @param $xml
+     *
+     * @return string
+     */
     private function _XMLFault2String($xml)
     {
         $dom = new DOMDocument();

@@ -1,6 +1,8 @@
 <?php
+
 class securesubmit
 {
+
     public $code;
     public $title;
     public $description;
@@ -26,7 +28,7 @@ class securesubmit
         $this->email_suspicious_address = MODULE_PAYMENT_SECURESUBMIT_EMAIL_SUSPICIOUS_ADDRESS;
         $this->fraud_text = MODULE_PAYMENT_SECURESUBMIT_FRAUD_TEXT;
 
-        if ((int)MODULE_PAYMENT_SECURESUBMIT_ORDER_STATUS_ID > 0) {
+        if ((int) MODULE_PAYMENT_SECURESUBMIT_ORDER_STATUS_ID > 0) {
             $this->order_status = MODULE_PAYMENT_SECURESUBMIT_ORDER_STATUS_ID;
         }
 
@@ -39,7 +41,7 @@ class securesubmit
     {
         global $order;
 
-        if (($this->enabled == true) && ((int)MODULE_PAYMENT_SECURESUBMIT_ZONE > 0)) {
+        if (($this->enabled == true) && ((int) MODULE_PAYMENT_SECURESUBMIT_ZONE > 0)) {
             $check_flag = false;
             $check_query = tep_db_query("select zone_id from " . TABLE_ZONES_TO_GEO_ZONES . " where geo_zone_id = '" . MODULE_PAYMENT_SECURESUBMIT_ZONE . "' and zone_country_id = '" . $order->billing['country']['id'] . "' order by zone_id");
             while ($check = tep_db_fetch_array($check_query)) {
@@ -83,6 +85,7 @@ class securesubmit
         $public_key = MODULE_PAYMENT_SECURESUBMIT_PUBLIC_API_KEY;
 
         if ($public_key == '') {
+
             ?>
             <script type="text/javascript">
                 alert('No Public Key found - unable to procede.');
@@ -90,89 +93,71 @@ class securesubmit
             <?php
         }
 
-        for ($i=1; $i<13; $i++) {
-            $expires_month[] = array(
-                'id' => sprintf('%02d', $i),
-                'text' => strftime('%B', mktime(0, 0, 0, $i, 1, 2000)),
-            );
-        }
+        $content = '<!-- make iframes styled like other form -->
+                <style type="text/css">
+                    #iframes iframe{
+                        float:left;
+                        width:100%;
+                    }
+                    .iframeholder:after,
+                    .iframeholder::after{
+                        content:"";
+                        display:block;
+                        width:100%;
+                        height:0px;
+                        clear:both;
+                        position:relative;
+                    }
+                </style>
 
-        $today = getdate();
-        for ($i=$today['year']; $i < $today['year']+10; $i++) {
-            $expires_year[] = array(
-                'id' => strftime('%Y', mktime(0, 0, 0, 1, 1, $i)),
-                'text' => strftime('%Y', mktime(0, 0, 0, 1, 1, $i)),
-            );
-        }
+                <!-- The Payment Form -->
+                <form id="iframes" action="" method="GET">
+                    <div class="form-group">
+                        <label for="iframesCardNumber">Card Number:</label>
+                        <div class="iframeholder" id="iframesCardNumber"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="iframesCardExpiration">Card Expiration:</label>
+                        <div class="iframeholder" id="iframesCardExpiration"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="iframesCardCvv">Card CVV:</label>
+                        <div class="iframeholder" id="iframesCardCvv"></div>
+                    </div>
+                </form>';
 
-        $confirmation = array(
-            'fields' => array(
-                array(
-                    'title' => MODULE_PAYMENT_SECURESUBMIT_CREDIT_CARD_NUMBER,
-                    'field' => tep_draw_input_field('', '', 'class="card_number"')
-                ),
-                array(
-                    'title' => MODULE_PAYMENT_SECURESUBMIT_CREDIT_CARD_EXPIRES,
-                    'field' => tep_draw_pull_down_menu('', $expires_month, '', 'class="card_expiry_month"') .
-                               '&nbsp;' . tep_draw_pull_down_menu('', $expires_year, '', 'class="card_expiry_year"')
-                ),
-                array(
-                    'title' => MODULE_PAYMENT_SECURESUBMIT_CREDIT_CARD_CVC,
-                    'field' => tep_draw_input_field('', '', 'class="card_cvc" size="5" maxlength="4"')
-                ),
-            ),
-        );
+        $content .= '<script type="text/javascript" src="https://api2.heartlandportico.com/SecureSubmit.v1/token/2.1/securesubmit.js"></script>';
 
         if (MODULE_PAYMENT_SECURESUBMIT_INCLUDE_JQUERY) {
-            $confirmation['title'] .= '<script type="text/javascript" src="' . DIR_WS_INCLUDES . 'jquery.js"></script>';
+            $content .= '<script type="text/javascript" src="' . DIR_WS_INCLUDES . 'jquery.js"></script>';
         }
 
-        $confirmation['title'] .= '<script type="text/javascript" src="' . DIR_WS_INCLUDES . 'secure.submit-1.1.1.js"></script>';
-        $confirmation['title'] .= '<script type="text/javascript">
+        $content .= '<script type="text/javascript">var public_key = \'' . $public_key . '\';</script>';
+        $content .= '<script type="text/javascript" src="' . DIR_WS_INCLUDES . 'secure.submit-1.1.1.js"></script>';
+        $content .= '<script type="text/javascript">                        
             jQuery(document).ready(function($) {
                 $("form[name=\'checkout_confirmation\']").bind("submit", handleSubmit);
-
-                function handleSubmit() {
-                    hps.tokenize({
-                        data: {
-                            public_key: \'' . $public_key . '\',
-                            number: $(\'.card_number\').val().replace(/\D/g, \'\'),
-                            cvc: $(\'.card_cvc\').val(),
-                            exp_month: $(\'.card_expiry_month\').val(),
-                            exp_year: $(\'.card_expiry_year\').val()
-                        },
-                        success: function(response) {
-                            secureSubmitResponseHandler(response);
-                        },
-                        error: function(response) {
-                            secureSubmitResponseHandler(response);
-                        }
-                    });
+                
+                function handleSubmit(e) { 
+                    // Prevent the form from continuing to the `action` address
+                    e.preventDefault();
+                    // Tell the iframes to tokenize the data
+                    hps.Messages.post(
+                            {
+                                accumulateData: true,
+                                action: \'tokenize\',
+                                message: public_key
+                            },
+                            \'cardNumber\'
+                    );
 
                     return false; // stop the form submission
-                }
-
-                function secureSubmitResponseHandler(response) {
-                    if ( response.message ) {
-                        alert(response.message);
-                    } else {
-                        var form$ = $("form[name=checkout_confirmation]");
-
-                        form$.append("<input type=\'hidden\' name=\'securesubmit_token\' value=\'" + response.token_value + "\'/>");
-                        form$.append("<input type=\'hidden\' name=\'card_type\' value=\'" + response.card_type + "\'/>");
-
-                        $(\'.card_number\').val(\'\');
-                        $(\'.card_cvc\').val(\'\');
-                        $(\'.card_expiry_month\').val(\'\');
-                        $(\'.card_expiry_year\').val(\'\');
-
-                        $("#tbd5").hide();
-                        $("form[name=\'checkout_confirmation\']").unbind("submit");
-                        $("form[name=\'checkout_confirmation\']").submit();
-                    }
-                }
+                }                
             });
             </script>';
+        
+
+        $confirmation['title'] = $content;
 
         return $confirmation;
     }
@@ -186,7 +171,7 @@ class securesubmit
     {
         global $HTTP_POST_VARS, $customer_id, $order, $sendto, $currency;
         $error = '';
-        require_once(DIR_FS_CATALOG.'ext/modules/payment/securesubmit/Hps.php');
+        require_once(DIR_FS_CATALOG . 'ext/modules/payment/securesubmit/Hps.php');
 
         $config = new HpsServicesConfig();
 
@@ -201,7 +186,7 @@ class securesubmit
         $hpsaddress->city = $order->billing['city'];
         $hpsaddress->state = $order->billing['state'];
         $hpsaddress->zip = preg_replace('/[^0-9]/', '', $order->billing['postcode']);
-        $hpsaddress->country =$order->billing['country']['title'];
+        $hpsaddress->country = $order->billing['country']['title'];
 
         $cardHolder = new HpsCardHolder();
         $cardHolder->firstName = $order->billing['firstname'];
@@ -217,21 +202,11 @@ class securesubmit
         try {
             if (MODULE_PAYMENT_SECURESUBMIT_TRANSACTION_METHOD == 'Authorization') {
                 $response = $creditService->authorize(
-                    substr($this->format_raw($order->info['total']), 0, 15),
-                    'usd',
-                    $hpstoken,
-                    $cardHolder,
-                    false,
-                    null
+                    substr($this->format_raw($order->info['total']), 0, 15), 'usd', $hpstoken, $cardHolder, false, null
                 );
             } else {
                 $response = $creditService->charge(
-                    substr($this->format_raw($order->info['total']), 0, 15),
-                    'usd',
-                    $hpstoken,
-                    $cardHolder,
-                    false,
-                    null
+                    substr($this->format_raw($order->info['total']), 0, 15), 'usd', $hpstoken, $cardHolder, false, null
                 );
             }
 
@@ -241,10 +216,7 @@ class securesubmit
                 // we can skip the card saving: if it fails for possible fraud there will be no token.
                 if ($this->email_suspicious && $this->email_suspicious_address != '') {
                     $this->sendEmail(
-                        $this->email_suspicious_address,
-                        $this->email_suspicious_address,
-                        'Suspicious order allowed (' . $order_id . ')',
-                        'Hello,<br><br>Heartland has determined that you should review order ' . $order_id .
+                        $this->email_suspicious_address, $this->email_suspicious_address, 'Suspicious order allowed (' . $order_id . ')', 'Hello,<br><br>Heartland has determined that you should review order ' . $order_id .
                         ' for the amount of ' . substr($this->format_raw($order->info['total']), 0, 15) . '.'
                     );
                 }

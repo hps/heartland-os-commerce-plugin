@@ -1,14 +1,28 @@
 <?php
 
+/**
+ * Class HpsGatewayException
+ */
 class HpsGatewayException extends HpsException
 {
     public $code    = null;
     public $details = null;
+    public $transactionId = null;
 
-    public function __construct($code, $message, $gatewayResponseCode = null, $gatewayResponseMessage = null, $innerException = null)
+    /**
+     * HpsGatewayException constructor.
+     *
+     * @param string $code
+     * @param null   $message
+     * @param null   $gatewayResponseCode
+     * @param null   $gatewayResponseMessage
+     * @param null   $innerException
+     * @param string $transactionId
+     */
+    public function __construct($code, $message, $gatewayResponseCode = null, $gatewayResponseMessage = null, $innerException = null, $transactionId = null)
     {
         $this->code = $code;
-        $this->message = $message;
+        $this->message = (string) $message;
 
         if ($gatewayResponseCode != null || $gatewayResponseMessage != null) {
             $this->details = new HpsGatewayExceptionDetails();
@@ -17,5 +31,7 @@ class HpsGatewayException extends HpsException
 
             $this->innerException = $innerException;
         }
+
+        $this->transactionId = $transactionId;
     }
 }
