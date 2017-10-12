@@ -1,12 +1,25 @@
 <?php
 
+/**
+ * Class HpsBatchService
+ */
 class HpsBatchService extends HpsSoapGatewayService
 {
+    /**
+     * HpsBatchService constructor.
+     *
+     * @param null $config
+     */
     public function __construct($config = null)
     {
         parent::__construct($config);
     }
-
+    /**
+     * @return \HpsBatch
+     * @throws \HpsAuthenticationException
+     * @throws \HpsGatewayException
+     * @throws null
+     */
     public function closeBatch()
     {
         $xml = new DOMDocument();
@@ -14,7 +27,7 @@ class HpsBatchService extends HpsSoapGatewayService
             $hpsBatchClose = $xml->createElement('hps:BatchClose');
         $hpsTransaction->appendChild($hpsBatchClose);
 
-        $response = $this->doTransaction($hpsTransaction);
+        $response = $this->doRequest($hpsTransaction);
         HpsGatewayResponseValidation::checkResponse($response, 'BatchClose');
 
         //Process the response
