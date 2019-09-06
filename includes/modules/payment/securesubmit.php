@@ -181,11 +181,7 @@ class securesubmit
     {
         global $HTTP_POST_VARS, $customer_id, $order, $sendto, $currency;
         $error = '';
-        //require_once(DIR_FS_CATALOG . 'ext/modules/payment/securesubmit/Hps.php');
-        /*$config = new HpsServicesConfig();
-        $config->secretApiKey = MODULE_PAYMENT_SECURESUBMIT_SECRET_API_KEY;
-        $config->versionNumber = '1515';
-        $config->developerId = '002914';*/
+        
         require 'vendor/autoload.php';
 
 
@@ -205,7 +201,6 @@ class securesubmit
         $cardHolder->email = $order->customer['email_address'];
         $cardHolder->address = $hpsaddress;
 
-        //$hpstoken = new HpsTokenData();
         $hpstoken = new CreditCardData();
         $hpstoken->token = $_POST['securesubmit_token'];
 
