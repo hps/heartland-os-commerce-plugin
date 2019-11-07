@@ -1,5 +1,15 @@
 <?php
 
+use GlobalPayments\Api\Entities\EncryptionData;
+use GlobalPayments\Api\PaymentMethods\CreditCardData;
+use GlobalPayments\Api\PaymentMethods\CreditTrackData;
+use GlobalPayments\Api\Services\CreditService;
+use GlobalPayments\Api\ServicesConfig;
+use GlobalPayments\Api\ServicesContainer;
+use GlobalPayments\Api\Entities\Address;
+use GlobalPayments\Api\Entities\Customer;
+use GlobalPayments\Api\Entities\Enums\ExceptionCodes;
+
 class securesubmit
 {
 
@@ -171,48 +181,40 @@ class securesubmit
     {
         global $HTTP_POST_VARS, $customer_id, $order, $sendto, $currency;
         $error = '';
-        require_once(DIR_FS_CATALOG . 'ext/modules/payment/securesubmit/Hps.php');
+        require_once(DIR_FS_CATALOG . 'ext/modules/payment/securesubmit/vendor/autoload.php');
 
-        $config = new HpsServicesConfig();
+        $creditService = $this->setConfig();
 
-        $config->secretApiKey = MODULE_PAYMENT_SECURESUBMIT_SECRET_API_KEY;
-        $config->versionNumber = '1515';
-        $config->developerId = '002914';
-
-        $creditService = new HpsCreditService($config);
-
-        $hpsaddress = new HpsAddress();
+        $hpsaddress = new Address();
         $hpsaddress->address = $order->billing['street_address'];
         $hpsaddress->city = $order->billing['city'];
         $hpsaddress->state = $order->billing['state'];
         $hpsaddress->zip = preg_replace('/[^0-9]/', '', $order->billing['postcode']);
         $hpsaddress->country = $order->billing['country']['title'];
 
-        $cardHolder = new HpsCardHolder();
-        $cardHolder->firstName = $order->billing['firstname'];
-        $cardHolder->lastName = $order->billing['lastname'];
-        $cardHolder->phone = preg_replace('/[^0-9]/', '', $order->customer['telephone']);
-        $cardHolder->email = $order->customer['email_address'];
-        $cardHolder->address = $hpsaddress;
-
-        $hpstoken = new HpsTokenData();
-        $hpstoken->tokenValue = $_POST['securesubmit_token'];
-
+        $hpstoken = new CreditCardData();
+        $hpstoken->token = $_POST['securesubmit_token']; 
+        $hpstoken->cardHolderName = $order->billing['firstname'];
 
         try {
             if (MODULE_PAYMENT_SECURESUBMIT_TRANSACTION_METHOD == 'Authorization') {
-                $response = $creditService->authorize(
-                    substr($this->format_raw($order->info['total']), 0, 15), 'usd', $hpstoken, $cardHolder, false, null
-                );
+                $response = $hpstoken->authorize(round($order->info['total'], 2))
+                ->withCurrency('USD')
+                ->withAddress($hpsaddress)
+                ->withAmountEstimated(round($order->info['total'], 2))
+                ->withAllowDuplicates(true)
+                ->execute();
             } else {
-                $response = $creditService->charge(
-                    substr($this->format_raw($order->info['total']), 0, 15), 'usd', $hpstoken, $cardHolder, false, null
-                );
+                $response = $hpstoken->charge(round($order->info['total'], 2))
+                ->withCurrency('USD')
+                ->withAddress($hpsaddress)
+                ->withAllowDuplicates(true)
+                ->execute();
             }
 
             $order->info['cc_type'] = $_POST['card_type'];
-        } catch (HpsException $e) {
-            if ($this->allow_suspicious && $e->getCode() == HpsExceptionCodes::POSSIBLE_FRAUD_DETECTED) {
+        } catch (Exception $e) {
+            if ($this->allow_suspicious && $e->getCode() == ExceptionCodes::POSSIBLE_FRAUD_DETECTED) {
                 // we can skip the card saving: if it fails for possible fraud there will be no token.
                 if ($this->email_suspicious && $this->email_suspicious_address != '') {
                     $this->sendEmail(
@@ -353,5 +355,14 @@ class securesubmit
         }
 
         return number_format(tep_round($number * $currency_value, $currencies->currencies[$currency_code]['decimal_places']), $currencies->currencies[$currency_code]['decimal_places'], '.', '');
+    }
+    
+    public function setConfig()
+    {
+        $config = new ServicesConfig();
+        $config->secretApiKey = MODULE_PAYMENT_SECURESUBMIT_SECRET_API_KEY;
+        $config->serviceUrl = "https://cert.api2.heartlandportico.com";
+        $service =  ServicesContainer::configure($config);
+        return $service;    
     }
 }
