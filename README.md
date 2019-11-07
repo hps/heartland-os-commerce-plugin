@@ -7,7 +7,6 @@ This extension allows OsCommerce to use the Heartland Payment Systems Gateway. A
 To install secureSubmit for OsCommerce follow these steps:
 
 •Download and extract the files in the root folder
-•Open the composer from the root directory and run the command "composer require globalpayments/php-sdk" 
 •In your OsCommerce Adminpanel, navigate to "Modules->Payment" under the Modules tab in the sidebar to the left.
 •Click the "Install module" button at the top of the page, find the module "SecureSubmit (Heartland Payment Systems)" and click on it and press the "Install Module" button
 •Your Module is been installed at this point click "edit", follow the link to add your API keys.
