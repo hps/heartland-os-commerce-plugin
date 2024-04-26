@@ -1,100 +1,80 @@
 // Create a new `HPS` object with the necessary configuration
-var hps = new Heartland.HPS({
-    publicKey: public_key,
-    type: 'iframe',
-    // Configure the iframe fields to tell the library where
-    // the iframe should be inserted into the DOM and some
-    // basic options
+var hps = GlobalPayments.ui.form({
     fields: {
-        cardNumber: {
-            target: 'iframesCardNumber',
-            placeholder: '•••• •••• •••• ••••'
+        'card-number': {
+            placeholder: '•••• •••• •••• ••••',
+            target: '#iframesCardNumber'
         },
-        cardExpiration: {
-            target: 'iframesCardExpiration',
-            placeholder: 'MM / YYYY'
+        'card-expiration': {
+            placeholder: 'MM / YYYY',
+            target: '#iframesCardExpiration'
         },
-        cardCvv: {
-            target: 'iframesCardCvv',
-            placeholder: 'CVV'
+        'card-cvv': {
+            placeholder: '•••',
+            target: '#iframesCardCvv'
         }
     },
-    // Collection of CSS to inject into the iframes.
-    // These properties can match the site's styles
-    // to create a seamless experience.
-    style: {
-        'input[type=text],input[type=tel]': {
-            'box-sizing': 'border-box',
-            'display': 'block',
-            'width': '100%',
-            'height': '34px',
-            'padding': '6px 12px',
-            'font-size': '14px',
-            'line-height': '1.42857143',
-            'color': '#555',
-            'background-color': '#fff',
-            'background-image': 'none',
-            'border': '1px solid #ccc',
-            'border-radius': '4px',
-            '-webkit-box-shadow': 'inset 0 1px 1px rgba(0,0,0,.075)',
-            'box-shadow': 'inset 0 1px 1px rgba(0,0,0,.075)',
-            '-webkit-transition': 'border-color ease-in-out .15s,-webkit-box-shadow ease-in-out .15s',
-            '-o-transition': 'border-color ease-in-out .15s,box-shadow ease-in-out .15s',
-            'transition': 'border-color ease-in-out .15s,box-shadow ease-in-out .15s'
+    styles:  {
+        'html' : {
+            '-webkit-text-size-adjust': '100%'
         },
-        'input[type=text]:focus,input[type=tel]:focus': {
-            'border-color': '#66afe9',
-            'outline': '0',
-            '-webkit-box-shadow': 'inset 0 1px 1px rgba(0,0,0,.075),0 0 8px rgba(102,175,233,.6)',
-            'box-shadow': 'inset 0 1px 1px rgba(0,0,0,.075),0 0 8px rgba(102,175,233,.6)'
+        'body' : {
+        'width' : '100%'
         },
-        'input[type=submit]': {
-            'box-sizing': 'border-box',
-            'display': 'inline-block',
-            'padding': '6px 12px',
-            'margin-bottom': '0',
-            'font-size': '14px',
-            'font-weight': '400',
-            'line-height': '1.42857143',
-            'text-align': 'center',
-            'white-space': 'nowrap',
-            'vertical-align': 'middle',
-            '-ms-touch-action': 'manipulation',
-            'touch-action': 'manipulation',
-            'cursor': 'pointer',
-            '-webkit-user-select': 'none',
-            '-moz-user-select': 'none',
-            '-ms-user-select': 'none',
-            'user-select': 'none',
-            'background-image': 'none',
-            'border': '1px solid transparent',
-            'border-radius': '4px',
+        '#secure-payment-field-wrapper' : {
+        'position' : 'relative',
+        'justify-content'  : 'flex-end'
+        },
+        '#secure-payment-field' : {
+        'background-color' : '#fff',
+        'border'           : '1px solid #ccc',
+        'border-radius'    : '4px',
+        'display'          : 'block',
+        'font-size'        : '14px',
+        'height'           : '35px',
+        'padding'          : '6px 12px',
+        'width'            : '100%',
+        },
+        '#secure-payment-field:focus' : {
+        'border': '1px solid lightblue',
+        'box-shadow': '0 1px 3px 0 #cecece',
+        'outline': 'none'
+        },
+        'button#secure-payment-field.submit' : {
+            'width': 'unset',
+            'flex': 'unset',
+            'float': 'right',
             'color': '#fff',
-            'background-color': '#337ab7',
-            'border-color': '#2e6da4'
+            'background': '#2e6da4',
+            'cursor': 'pointer'
         },
-        'input[type=submit]:hover': {
-            'color': '#fff',
-            'background-color': '#286090',
-            'border-color': '#204d74'
+        '.card-number::-ms-clear' : {
+        'display' : 'none'
         },
-        'input[type=submit]:focus, input[type=submit].focus': {
-            'color': '#fff',
-            'background-color': '#286090',
-            'border-color': '#122b40',
-            'text-decoration': 'none',
-            'outline': '5px auto -webkit-focus-ring-color',
-            'outline-offset': '-2px'
-        }
-    },
-    // Callback when a token is received from the service
-    onTokenSuccess: function (resp) { 
-        secureSubmitResponseHandler(resp);
-    },
-    // Callback when an error is received from the service
-    onTokenError: function (resp) {
+        'input[placeholder]' : {
+        'letter-spacing' : '.5px',
+        },
+    }
+});
+
+hps.on('token-success', function(resp) {
+    if(resp.details.cardSecurityCode == false) {
+        document.getElementById('gps-error').style.display = 'block';
+        document.getElementById('gps-error').innerText = 'Invalid Card Details';
+        $("#tdb5").prop("disabled", false);
+    }else{
         secureSubmitResponseHandler(resp);
     }
+});
+
+hps.on('token-error', function(resp) {
+    if(resp.error){
+        resp.reasons.forEach(function(v){
+            document.getElementById('gps-error').style.display = 'block';
+            document.getElementById('gps-error').innerText = v.message;
+        })
+    }
+    $("#tdb5").prop("disabled", false);
 });
 
 function secureSubmitResponseHandler(response) {
@@ -103,13 +83,46 @@ function secureSubmitResponseHandler(response) {
     } else {
         var form$ = $("form[name=checkout_confirmation]");
 
-        form$.append("<input type='hidden' name='securesubmit_token' value='" + response.token_value + "'/>");
-        form$.append("<input type='hidden' name='card_type' value='" + response.card_type + "'/>");
+        form$.append("<input type='hidden' name='securesubmit_token' value='" + response.paymentReference + "'/>");
+        form$.append("<input type='hidden' name='card_type' value='" + response.details.cardType + "'/>");
 
-        $("#tbd5").hide();
         $("form[name='checkout_confirmation']").unbind("submit");
         $("form[name='checkout_confirmation']").submit();
     }
+    $("#tdb5").prop("disabled", false);
     return false;
 }
+
+var triggerSubmit = function () {
+    // manually include iframe submit button
+    const fields = ['submit'];
+    const target = hps.frames['card-number'];
+
+    for (const type in hps.frames) {
+      if (hps.frames.hasOwnProperty(type)) {
+        fields.push(type);
+      }
+    }
+
+    for (const type in hps.frames) {
+      if (!hps.frames.hasOwnProperty(type)) {
+        continue;
+      }
+
+      const frame = hps.frames[type];
+
+      if (!frame) {
+        continue;
+      }
+
+      GlobalPayments.internal.postMessage.post({
+        data: {
+          fields: fields,
+          target: target.id
+        },
+        id: frame.id,
+        type: 'ui:iframe-field:request-data'
+      }, frame.id);
+    }
+  }
 
