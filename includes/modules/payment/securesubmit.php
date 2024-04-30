@@ -108,8 +108,17 @@ class securesubmit
                         clear:both;
                         position:relative;
                     }
+                    #gps-error{
+                        border: 1px solid;
+                        margin: 10px 0px;
+                        padding: 10px 10px;
+                        color: #D8000C;
+                        background-color: #FFBABA;
+                        text-align: center;
+                        display:none
+                    }
                 </style>
-
+                <div id="gps-error"></div>
                 <!-- The Payment Form -->
                 <form id="iframes" action="" method="GET">
                     <div class="form-group">
@@ -126,7 +135,7 @@ class securesubmit
                     </div>
                 </form>';
 
-        $content .= '<script type="text/javascript" src="https://api2.heartlandportico.com/SecureSubmit.v1/token/2.1/securesubmit.js"></script>';
+        $content .= '<script type="text/javascript" src="https://js.globalpay.com/v1/globalpayments.js"></script>';
 
         if (MODULE_PAYMENT_SECURESUBMIT_INCLUDE_JQUERY) {
             $content .= '<script type="text/javascript" src="' . DIR_WS_INCLUDES . 'jquery.js"></script>';
@@ -135,28 +144,20 @@ class securesubmit
         $content .= '<script type="text/javascript">var public_key = \'' . $public_key . '\';</script>';
         $content .= '<script type="text/javascript" src="' . DIR_WS_INCLUDES . 'secure.submit-1.1.1.js"></script>';
         $content .= '<script type="text/javascript">                        
-            jQuery(document).ready(function($) {
-                $("form[name=\'checkout_confirmation\']").bind("submit", handleSubmit);
-                
-                function handleSubmit(e) { 
-                    // Prevent the form from continuing to the `action` address
-                    e.preventDefault();
-                    // Tell the iframes to tokenize the data
-                    hps.Messages.post(
-                            {
-                                accumulateData: true,
-                                action: \'tokenize\',
-                                message: public_key
-                            },
-                            \'cardNumber\'
-                    );
+                        jQuery(document).ready(function($) {
+                            $("form[name=\'checkout_confirmation\']").bind("submit", handleSubmit);
+                            GlobalPayments.configure({
+                                "publicApiKey":  \''.$public_key.'\'
+                            });
 
-                    return false; // stop the form submission
-                }                
-            });
+                            function handleSubmit(e) {
+                                // Prevent the form from continuing to the `action` address
+                                e.preventDefault();
+                                triggerSubmit();
+                            }
+                        });
             </script>';
         
-
         $confirmation['title'] = $content;
 
         return $confirmation;
